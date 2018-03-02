@@ -1,0 +1,331 @@
+README for CDDB.py and DiscID.py, version 1.4
+
+Copyright (C) 1999-2003 Ben Gertzfield <che@debian.org>
+-------------------------------------------------------
+
+The dynamic duo of CDDB.py and DiscID.py, along with their side-kick C
+module cdrommodule.so, provide an easy way for Python programs to
+fetch information on audio CDs from CDDB (http://www.cddb.com/) -- a
+very large online database of track listings and other information on
+audio CDs.  UNIX platforms and Windows are both supported.
+
+This work is released under the GNU GPL; see the file COPYING for more
+information.
+
+Note that for CDDB.py version 1.3 and later, the default CDDB servers
+have changed to FreeDB, as GraceNote, the owners of the
+previously-free CDDB archives, have become unreasonably restrictive
+with access to their database.  See http://www.freedb.org/ for more
+information on FreeDB.
+
+The old CDDB servers are still usable, but GraceNote has banned all
+"non-registered" programs -- including CDDB.py -- from accessing their
+databases.  I'm not particularly interested in bending over backwards
+for them, but CDDB.query() can still access any CDDB host you specify,
+and from version 1.3 on, also allows you to 'fake' the identification
+string to anything you wish for accessing their servers.
+
+-----
+
+If you are using Python 1.6 or 2.0 or later on Linux, FreeBSD,
+OpenBSD, Mac OS X, or Solaris, installing is simple.  As root, run:
+
+# python setup.py install
+
+(This also works if you have installed Distutils on an older
+Python. See http://www.python.org/sigs/distutils-sig/download.html for
+more information.)
+
+-----
+
+If you have an older version of Python installed on Linux, FreeBSD,
+OpenBSD, Mac OS X, or Solaris:
+
+% make -f Makefile.pre.in boot
+% make
+
+Then copy CDDB.py, DiscID,py, and cdrommodule.so to your local
+Python packages directory (usually /usr/lib/python1.5/site-packages).
+
+-----
+
+If you are using Python 2.0 on Windows, you can simply extract the
+following files to your C:\Python20\Lib\ directory:
+
+CDDB.py DiscID.py win32\cdrom.py win32\mci.dll
+
+Older revisions of Python will require a by-hand recompile of
+win32\mci.c; win32\mci.dsp has been provided for Visual C++ users.
+
+I do not have access to a Windows compiler, so I cannot support the
+module very well.  However, I have tested that it works on Windows
+2000 with Python 2.0.  Thanks to Mike Roberts <zoarre@yahoo.com> for
+recompiling the mci.dll library for Python 2.0!
+
+There is an experimental setup-win32.py Distutils, which (in theory)
+works the same as the *nix method (python setup-win32.py install) on
+Windows.  Completely untested.
+
+-----
+
+The distribution is split up into three parts: 
+
+* CDDB.py, for querying the online CDDB servers.
+* cdrommodule.so, a C extension module, for actually querying the 
+  CD-ROM drive for the track start times and other data.
+* DiscID.py, a wrapper around cdrommodule.so, which formats the
+  track data the way the CDDB protocol requires it.
+
+Also included is cddb-info.py, a quick example of how to use CDDB.py
+and DiscID.py together to fetch the track info of an audio CD.  Feel
+free to use this to understand how to make your own Python CDDB
+applications!
+
+For another example as to how CDDB.py works, see Russ Nelson's
+MP3 renamer program: http://russnelson.com/rename-tracks
+
+DiscID.py
+---------
+
+The DiscID.py module is a platform-independant wrapper around the
+cdrommodule.so C extension, and is used to get the track information
+of an audio CD into the format the CDDB protocol requires.
+
+There are two methods of the DiscID module that are of interest:
+
+device = DiscID.open() 
+  
+  This is the default, cross-platform way to open the audio
+  CD-ROM device.  The device defaults to /dev/cdrom on Linux and BSD,
+  /dev/disk1 on Mac OS X, /dev/vol/aliases/cdrom0 on Solaris, and
+  cdaudio under Windows.  You do not have to use this function to open
+  the audio CD-ROM device, but it's a sane default.
+ 
+  If you want to specify a different device name or flags for opening, 
+  use the following:
+
+device = DiscID.open(devicename, flags)
+
+  The optional flags parameter should be an int under *nix, and a
+  string under Windows.  Flags come from the fcntl module under *nix.
+
+disc_id = DiscID.disc_id(device)
+
+  Given an opened file object corresponding to a CD-ROM device (either
+  opened by hand, or returned from DiscID.open above), return an array
+  of the format:
+
+  [cddb_checksum, num_tracks, num_frames 1, ... num_frames n, num_seconds]
+
+  cddb_checksum is the 128-bit checksum of the track information,
+  as specified by CDDB
+
+  num_tracks is the number of tracks on the disc
+
+  num_frames x is the offset of the start of track x, in terms of
+  frames. A frame is simply 1/75th of a second.  x ranges from
+  1 to num_tracks.
+
+  num_seconds is the total number of seconds on the disc, as measured
+  by the start of the special 'lead-out' track.
+
+The disc_id returned from DiscID.disc_id may look complex, but it's
+exactly in the format CDDB wants, and is the format needed for
+CDDB.query(disc_id), as described below.
+
+CDDB.py
+-------
+
+The CDDB.py module is platform-independant; its job is to query
+the online CDDB servers via HTTP and retrieve track listings and
+any other data relevant to the specified audio CD.
+
+There are two methods of the CDDB module that are of interest:
+
+(status, info) = CDDB.query(disc_id, [server_url], [user], [host],
+                            [client_name], [client_version])
+
+  Given a disc_id, as returned from DiscID.disc_id() above,
+  return a tuple of two items. The first item returned is an integer
+  indicating the status returned from the server; it will be one of
+  the following:
+
+  * 200: Success
+  * 211: Multiple inexact matches were found
+  * 210: Multiple exact matches were found
+  * 202: No match found
+  * 403: Error; database entry is corrupt
+  * 409: Error; no handshake. (client-side error?)
+
+  Any other return code is failure due to a server or client error.
+
+  The actual contents of the second item returned depend on the
+  status returned by the server. On 200, a dictionary containing
+  three items is returned:
+
+  info['category']: The category the audio CD belongs in
+  info['disc_id']:  The CDDB checksum disc ID of the given disc
+  info['title']:    The title of the audio CD
+
+  On 211 or 210, a list will be returned as the second item.  Each
+  element of the list will be a dictionary containing three items,
+  exactly the same as a single 200 success return.
+
+  On any other status, None will be returned as the second item.
+ 
+  By default, the server http://freedb.freedb.org/~cddb/cddb.cgi will
+  be used. You can specify a different server URL as the second
+  argument to CDDB.query().
+
+  The identification string used to tell the CDDB servers what
+  program is accessing them defaults to CDDB.py, but you can
+  change that by specifying different client_name and
+  client_version arguments to CDDB.query().
+
+  The optional user and host arguments are sent in the 'hello'
+  portion of the CDDB query. They should correspond to the
+  user's email address (if you believe in the CDDB docs, that
+  is -- it may not be nice to send the user's email address 
+  without asking them!)
+
+  By default, if the EMAIL environment variable is set, user
+  and host will be set by parsing $EMAIL into user@host.
+
+  Otherwise, user will default to os.geteuid(), falling back
+  to os.environ['USER'], then just plain 'user', and host
+  will default to socket.gethostname() or just plain 'host' if
+  that fails.
+
+(status, info) = CDDB.read(category, disc_id, [server_url], [user], [host],
+                           [client_name], [client_version])
+
+  Given a category and a disc ID checksum as returned from
+  CDDB.query(), return a tuple of two items. The first item returned
+  is an integer indicating the status, as above. It will be one of
+  the following:
+
+  * 210: Success
+  * 401: Specified entry not found
+  * 402: Server error
+  * 403: Database entry is corrupt
+  * 409: No handshake
+  * 417: Access limit exceeded
+
+  Any other return value is a server or client error.  
+
+  The second value returned from CDDB.read() depends on the status
+  returned by the server. On 210, a dictionary will be returned,
+  the keys of which follow the keywords returned by the CDDB read
+  command.
+
+  Dictionary entries that will be of interest (note: not all of
+  these keys will always be available for all discs):
+
+  info['TTITLE#'] (where # ranges from 1 to the last track on the disc):
+    The title of track number #. Note that this is not padded on the
+    left with zeroes.
+
+  info['DTITLE']
+    The title of the disc.
+
+  info['EXTD']
+    Extended data on the CD. (credits, etc.)
+
+  info['EXTT#']
+    Extended data on track number #.
+
+  info['submitted_via']
+    Optional; name of the client that submitted the data for this disc
+
+  info['revision']
+    Optional; revision of this CDDB entry
+
+  info['DYEAR']
+    Optional; year this disc was released
+
+  info['DGENRE']
+    Optional; Genre string describing this disc
+
+  Note that aside from TTITLE#, most of these fields will be empty
+  strings for most discs. Also, submitted_via and revision are
+  technically in the comments returned from the server, so may or
+  may not even be there. Test first!
+
+  As with CDDB.query(), server_url, user, host, client_name, and
+  client_version are all optional. See above for the defaults.
+
+cdrommodule.so
+--------------
+  
+  This is the platform-specific part of the trio. I have included
+  unix/cdrommodule.c, which implements the necessary functions under
+  Linux, FreeBSD, OpenBSD, Mac OS X, and Solaris, but the interface is
+  intended to be easy enough to implement on any platform.
+
+  If you want to write your own cdrommodule.so for your platform,
+  here are the functions you'll need to export:
+
+  device = cdrom.open([device], [flags])
+    If given no arguments, perform the proper platform-specific
+    steps to open the default CDROM audio device and return an opened
+    Python file object corresponding to it.
+ 
+    If called with one argument, override the default CDROM audio
+    device with this argument.  If called with two arguments, open
+    the device with the specified flags (integer on *nix, string on
+    Windows.)
+ 
+    On Windows, which does not use an opened file object to represent
+    the CDROM audio device, returning a string describing the device 
+    is acceptable, as the other functions will just use that instead
+    of the opened file.
+
+  (first, last) = cdrom.toc_header(file)
+    Given an open file object corresponding to a CD-ROM device,
+    return a tuple of two integer values, (first, last). These are the
+    track numbers of the first and last tracks, respectively.
+
+  (min, sec, frame) = cdrom.toc_entry(file, track)
+    Given an open file object and a track number, return a tuple
+    of three integer values, (minute, second, frame). These correspond
+    to the start time of the track, as given in MSF form. Note that
+    a frame is simply 1/75th of a second.
+
+  (min, sec, frame) = cdrom.leadout(file)
+    Given an open file object, return a tuple of three integer values,
+    (minute, second, frame). These correspond to the start time of
+    the special 'leadout' track, generally track 0xAA, as given in
+    MSF form. 
+
+    If your platform (i.e. Windows) cannot return this leadout
+    track's time directly, you'll need to calculate it by taking the
+    starting position of the last track and adding the length of the
+    last track onto that. Watch out, because Windows' awful interface
+    returns the length of the last track as one frame short of the
+    real value!
+
+  Note that I throw the exception 'cdrom.error' upon an error;
+  you should stick to throwing that if your ioctls (or whatever
+  your platform uses) fail, so we can stay consistant.
+
+  It's relatively easy to write your own cdrommodule.so for whatever
+  platform you're on. Look at unix/cdrommodule.c for hints. If you
+  end up doing it and you'd like to have your module included in
+  the source distribution, just contact me at the email address
+  above.
+
+  Thanks to Viktor Fougstedt <viktor@dtek.chalmers.se> for the porting
+  information for Solaris, and Michael Yoon <michael@yoon.org> for the
+  FreeBSD port!
+
+  Also, thanks to Frank David <F.David@digitecgmbh.de> for the win32
+  port.  Note that this email address seems to be gone; I have no more
+  contact with Frank.  Mike Roberts <zoarre@yahoo.com> has been extremely
+  helpful in providing an updated mci.dll for Python 2.0; thank you,
+  Mike!
+
+  And thanks to Alexander S . Guy <a7r@andern.org> for the OpenBSD
+  patch.
+
+  Finally, thanks to Andre Beckedorf and Jeffrey C. Jacobs for the
+  Mac OS X cdrommodule.c port.

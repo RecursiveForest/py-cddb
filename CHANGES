@@ -1,0 +1,79 @@
+v1.4
+----
+
+Updated FreeDB version field to 5; this allows us to get access to the
+DYEAR and DGENRE fields in disc info from CDDB.read().
+
+Added Mac OS X support to cdrommodule.c; thanks to Andre Beckedorf
+and Jeffrey C. Jacobs.
+
+Changed default Solaris CD-ROM device to /dev/vol/aliases/cdrom0.
+
+v1.3
+----
+
+Phew. Lots of updating.
+
+Default to freedb.freedb.org for the CDDB server; I don't want to play
+GraceNote's licensing games.  FreeDB is great and works perfectly.
+
+New cdrom.open() and wrapper DiscID.open() calls to perform
+"do what I mean" CD audio device opening appropriate to each
+platform; even works on Win32.
+
+Update win32/mci.dll for Python 2.0; thanks to Mike Roberts
+<zoarre@yahoo.com> for the recompile!  Also, remove all occurences of
+'import fcntl', as it's no longer necessary with the new DiscID.open()
+call.  Tested and works on Windows 2000 with Python 2.0.
+
+Update cddb-info.py to reflect the new simple DiscID.open() call.
+
+Update setup.py to use the new Extension module instead of the
+old way for specifying which C files to compile.
+
+Update win32/cdrom.py to add a cdrom.open() call.  Since win32 does
+not use an open file for the audio cdrom, just returns the "device"
+string passed in. The default of cdaudio should be fine for most
+people, but I assume there are alternate "device" names.
+
+Update unix/cdrommodule.c to add a cdrom.open() call.  Uses #define'd
+defaults appropriate to each platform for both the CDROM device file
+name (/dev/cdrom on bsd/linux, /dev/vol/alias/cdrom0 on Solaris) and
+the flags to use (O_RDONLY | O_NONBLOCK on Linux).
+
+Add setup-win.py, experimental win32 setup.py.  Untested.
+
+v1.2
+----
+
+OpenBSD support by "Alexander S . Guy" <a7r@andern.org>. Thanks!
+
+Hopefully now that Python 1.6 has been released, distutils will
+start to be used. I haven't tested this version under 1.6 yet,
+but I assume it will still work.
+
+v1.1
+----
+
+Fixes for odd cases under recent-ish Linux kernels, whereby the cdrom
+driver wants programs to open the device in mode O_RDONLY | O_NONBLOCK
+if they're reading audio tracks.
+
+Fix for when running DiscID.py from command line, was passing in
+name of device rather than opened device previously (how embarassing!)
+
+v1.0
+----
+
+First full 1.0 release. Fixed several bugs related to multiple
+match returns from CDDB in CDDB.py and cddb-info.py.
+
+cdrom module now supports FreeBSD, Linux, Solaris, and Win32.
+
+Provide setup.py for when distutils starts being used.
+
+v0.5
+----
+
+Initial release. Most functionality is there. cdrom module only
+provided for Linux.
